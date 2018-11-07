@@ -123,12 +123,11 @@ let _stringLiteralChar_ =
 	PC.diff _otherThanSlashOrDoubleQuote _backSlashOrDoubleQuote_;;
 
 let _stringChar_ = PC.disj_list ([_stringHexChar_;_stringMetaChar_;_stringLiteralChar_;]);;
-(*
-                NEED TO CHECK                *)
+                
 let _string_ = 
-	let _doubleQuote_ =  PC.char '\"' in
-	PC.caten (PC.caten (_doubleQuote_ (PC.star _stringChar_))) _doubleQuote_;;
-	
+	let _doubleQuote_ = PC.char '\"' in
+	let _strings_ = PC.caten (PC.caten _doubleQuote_ (PC.star _stringChar_)) _doubleQuote_ in
+	PC.pack _strings_ (fun ((a,b) , c) -> String(list_to_string (b)));;
 
 let _integer_ =
 	let _plusOrMinus_ = PC.maybe (PC.disj (PC.char '+') (PC.char '-')) in
@@ -152,7 +151,6 @@ let _float_ =
   	| (Int x_int) -> Float(if float_of_int x_int > 0.0 then float_of_int x_int +. afterDot
   	else float_of_int x_int -. afterDot)
   	| _ -> Float(0.0));;
-
 
 
 let _hexInteger_ = 
@@ -187,17 +185,54 @@ let _number_ =
 	let _numbers_ = PC.disj (PC.disj (PC.disj _hexFloat_ _float_) _hexInteger_) _integer_ in
 	PC.pack _numbers_ (fun (a) -> Number(a));;
 
+let rec _sexpr_ = 
+	let _sexprs_ = PC.disj_list([_boolean_;_char_;_number_;_string_;_symbol_;_list_])
+
+	and _list_ = PC.caten_list [_lparen_ ;PC.star _sexpr_; _rparen_] in
+		PC.pack _list_ (fun ((a,b),c) -> List(b));;
+(*
+	and  _dottedList_ = 
+		let _dot_ = PC.char '.' in
+		let _plusSexpr_ = PC.plus _sexpr_ in
+		PC.caten (PC.caten (_plusSexpr_ _dot)) (_sexpr_)
+
+	and _vector_ = 
+		let _hush_ =PC.char('#') in
+		let _sexprStar_=PC.star (_sexpr_) in
+		PC.caten ( _hush_ _sexprStar_ ) 
+
+	and _quoted_ =  
+		let _quote_ = PC.char '\'' in
+		PC.caten _quote_ _sexpr_ 
+
+
+	and _quasiQuoted_ =  
+		let _quasiQuote_ =PC.char('`') in
+		PC.caten _quasiQuote_ _sexpr_ 
+
+
+	and _unquoted_ =  
+		let _unquote_ =PC.char(',') in
+		PC.caten _unquote_ _sexpr_ 
+
+
+	and _unquotedAndSpliced_ =  
+		let _unquotedAndSplice_ =PC.word(",@") in
+		PC.caten _unquotedAndSplice_ _sexpr_;; 	
+*)
+let make_enclosed _l_ _p_ _r_ =
+  let _enclosed_ = PC.caten (PC.caten _l_ _p_) _r_ in
+  PC.pack _enclosed_ (fun ((l, p), r) -> p);;
+
+let make_spaced _p_ = 
+  let _st_space_ = PC.star _space_ in
+  make_enclosed _st_space_ _p_ _st_space_;;
+  
 let _space_ = PC.char ' ';;
 let _lparen_ = make_spaced (PC.char '(');;
 let _rparen_ = make_spaced (PC.char ')');;
 let _mulop_ = make_spaced (PC.char '*');;
 let _addop_ = make_spaced (PC.char '+');;
-let make_enclosed _l_ _p_ _r_ =
-  let _enclosed_ = PC.caten (PC.caten _l_ _p_) _r_ in
-  PC.pack _enclosed_ (fun ((l, p), r) -> p);;
-let make_spaced _p_ = 
-  let _st_space_ = PC.star _space_ in
-  make_enclosed _st_space_ _p_ _st_space_;;
 
 let rec sexpr_eq s1 s2 =
   match s1, s2 with
